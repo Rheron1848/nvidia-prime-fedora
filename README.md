@@ -4,6 +4,9 @@
 >
 > ⚠️ **本项目由 AI 辅助完成（Claude，by Anthropic）。**
 
+> ⚠️ **This project is still under development， without any quality assurance， please do not use it！**
+>
+> ⚠️ **本项目仍在开发中，未经任何测试，请勿使用！**
 ---
 
 Reverse PRIME GPU switching for NVIDIA 390.xx (Fermi) + muxless Optimus laptops on Fedora 43,
