@@ -1,0 +1,9 @@
+#!/usr/bin/sh
+# Xsetup - run as root before the login dialog appears
+# 等效于 LightDM 的 display-setup-script
+
+# PRIME 配置（若 prime-offload 不存在则跳过，不阻断登录）
+if [ -x /usr/local/bin/prime-offload ]; then
+    /usr/local/bin/prime-offload
+fi
+

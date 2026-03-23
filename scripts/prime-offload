@@ -1,0 +1,63 @@
+#!/bin/sh
+# prime-offload - 复现 Ubuntu nvidia-prime 的 prime-offload 脚本
+# 在 X 启动后、登录界面出现前以 root 执行
+# 作用：建立 Reverse PRIME 路由（NVIDIA 渲染 → Intel 显示）
+#
+# 参考：https://github.com/canonical/nvidia-prime
+# 适用：nvidia 390.xx + SDDM + Fedora 43
+
+LOG=/var/log/prime-offload.log
+rm -f "$LOG"
+
+log() { echo "[$(date '+%H:%M:%S')] $*" >> "$LOG"; }
+
+# 检查 nvidia 模块是否加载
+if ! lsmod | grep -q "^nvidia "; then
+    log "nvidia 模块未加载，跳过 PRIME 配置"
+    exit 0
+fi
+
+# 检查 xrandr 是否可用
+if ! command -v xrandr >/dev/null 2>&1; then
+    log "xrandr 不可用"
+    exit 0
+fi
+
+# 检查 RandR 版本（需要 >= 1.4）
+randr_server=$(xrandr -v 2>/dev/null | grep -i server | awk '{print $NF}' | cut -d. -f2)
+if [ -z "$randr_server" ] || [ "$randr_server" -lt 4 ]; then
+    log "RandR server 版本过低（需要 >= 1.4）"
+    exit 0
+fi
+
+# 动态查询 provider（不硬编码名称）
+providers=$(xrandr --listproviders 2>/dev/null)
+log "providers: $(echo "$providers" | tr '\n' '|')"
+
+# Source Output = NVIDIA，Sink Output = modesetting/Intel
+src=$(echo "$providers"  | grep " Source" | head -n1 | awk '{print $NF}' | cut -d: -f2)
+sink=$(echo "$providers" | grep " Sink"   | head -n1 | awk '{print $NF}' | cut -d: -f2)
+
+if [ -z "$src" ] || [ -z "$sink" ]; then
+    log "找不到 Source 或 Sink provider（src='$src' sink='$sink'），跳过"
+    exit 0
+fi
+
+log "src=$src  sink=$sink"
+
+# 核心：将 sink(Intel) 的输出来源设为 src(NVIDIA)
+# 注意参数顺序：--setprovideroutputsource <sink> <source>
+xrandr --setprovideroutputsource "$sink" "$src" >> "$LOG" 2>&1 || true
+xrandr --auto >> "$LOG" 2>&1 || true
+
+# 找内屏（LVDS 或 eDP），off/auto 循环确保点亮
+lvds=$(xrandr 2>/dev/null | grep -i -e "lvds" -e "edp" | head -n1 | cut -d" " -f1)
+if [ -n "$lvds" ]; then
+    log "内屏: $lvds，执行 off/auto"
+    xrandr --output "$lvds" --off  >> "$LOG" 2>&1 || true
+    xrandr --output "$lvds" --auto >> "$LOG" 2>&1 || true
+else
+    log "未找到内屏（LVDS/eDP）"
+fi
+
+log "prime-offload 完成"

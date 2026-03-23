@@ -1,0 +1,9 @@
+# 不追踪大文件
+*.run
+*.iso
+*.tar.gz
+*.tar.xz
+
+# 系统生成的
+__pycache__/
+*.pyc

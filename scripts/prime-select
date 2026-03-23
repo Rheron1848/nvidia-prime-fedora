@@ -1,0 +1,62 @@
+#!/bin/sh
+# prime-select - GPU 模式切换工具
+# 用法：prime-select nvidia | intel | status
+# 切换后需重新登录生效
+
+XORG_CONF_DIR="/etc/X11/xorg.conf.d"
+PRIME_CONF="$XORG_CONF_DIR/10-optimus-prime.conf"
+PRIME_CONF_BACKUP="$XORG_CONF_DIR/10-optimus-prime.conf.disabled"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+CONF_SRC="$(dirname "$SCRIPT_DIR")/config/X11/xorg.conf.d/10-optimus-prime.conf"
+
+usage() {
+    echo "用法: prime-select <nvidia|intel|status>"
+    echo "  nvidia  - 切换到独显模式（Reverse PRIME，需要重新登录）"
+    echo "  intel   - 切换到核显模式（删除 nvidia xorg 配置，需要重新登录）"
+    echo "  status  - 查看当前模式"
+}
+
+check_root() {
+    if [ "$(id -u)" -ne 0 ]; then
+        echo "错误：需要 root 权限，请用 sudo 运行"
+        exit 1
+    fi
+}
+
+do_status() {
+    if [ -f "$PRIME_CONF" ]; then
+        echo "当前模式: nvidia（Reverse PRIME）"
+    else
+        echo "当前模式: intel（核显）"
+    fi
+}
+
+do_nvidia() {
+    check_root
+    if [ ! -f "$CONF_SRC" ]; then
+        echo "错误：找不到配置文件 $CONF_SRC"
+        echo "请从仓库复制 config/X11/xorg.conf.d/10-optimus-prime.conf"
+        exit 1
+    fi
+    cp "$CONF_SRC" "$PRIME_CONF"
+    echo "已写入 $PRIME_CONF"
+    echo "⚠️  请重新登录 X11 会话以生效"
+}
+
+do_intel() {
+    check_root
+    if [ -f "$PRIME_CONF" ]; then
+        mv "$PRIME_CONF" "$PRIME_CONF_BACKUP"
+        echo "已移除 nvidia xorg 配置（备份至 $PRIME_CONF_BACKUP）"
+    else
+        echo "nvidia xorg 配置不存在，已是 intel 模式"
+    fi
+    echo "⚠️  请重新登录 X11 会话以生效"
+}
+
+case "$1" in
+    nvidia) do_nvidia ;;
+    intel)  do_intel  ;;
+    status) do_status ;;
+    *)      usage; exit 1 ;;
+esac
